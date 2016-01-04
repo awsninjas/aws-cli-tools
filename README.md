@@ -11,6 +11,7 @@ CloudFormation stack.
 
 ## Installation
 To use these tools, simply clone the repository and set up a Python virtualenv:
+
 1. git clone https://github.com/awsninjas/aws-cli-tools.git
 2. cd aws-cli-tools
 3. mkdir ./virtualenv
