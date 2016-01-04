@@ -24,6 +24,8 @@ These tools have all been developed against Python 2.7.10
 ###cfn-launcher.py
    python ./cfn-launcher.py --help
    usage: cfn-launcher.py [-h] [-p PROFILE] [-s S3BUCKET] [-k KEY] [-o OPTIONS] template
+
+Refer to the file _cfn-stack-options-template.conf_ for stack options / parameters configuration.
    
 ## Contributions
 Please feel free to use, build upon, and enhance these tools.  More will be added over time!  We are gladly accepting pull requests.
