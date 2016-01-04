@@ -60,6 +60,27 @@ def upload_template(session, s3bucket, s3location, cfntemplate, cfntemplatefilen
         sys.exit(2)
 
 
+def upload_files(session, s3bucket, s3location, directory):
+    # Upload all files from the provided directory into the S3 bucket at the provided location:
+    s3 = session.resource('s3')
+
+    print "Uploading extra files to S3 from:", directory
+
+    try:
+        for root, dirs, filenames in os.walk(directory):
+            for f in filenames:
+                print 'Uploading', f, 'to S3 as:', 's3://' + s3bucket.name + '/' + s3location + root + '/' \
+                                                   + f
+
+                data = open(root + '/' + f, 'rb')
+                s3bucket.put_object(Key=s3location + root + '/' + f, Body=data)
+        return True
+    except botocore.exceptions.ClientError:
+        print 'ERROR: Failed while uploading extra files to S3 bucket:', sys.exc_info()[1]
+        print 'Exiting with error code 2'
+        sys.exit(2)
+
+
 def validate_template(session, cfntemplate, cfntemplate_url):
     # Validate the CloudFormation template using AWS' validation service:
     cf = session.resource('cloudformation')
@@ -166,23 +187,41 @@ if __name__ == '__main__':
                                                         "store the CloudFormation template")
     parser.add_argument('-o', '--options', default='', help="a file containing the CloudFormation stack options, "
                                                             "such as parameters, policies, notifications, etc.")
+    parser.add_argument('-f', '--files', default='', help="a directory containing extra files to upload to the provided"
+                                                          " S3 bucket. Useful for Lambda functions deployed via "
+                                                          "CloudFormation or any other template dependencies.")
     parser.add_argument('template', help="specifies CloudFormation template file")
     args = parser.parse_args()
 
     # Friendly vars:
     profile = args.profile
-    s3bucket = args.s3bucket
-    s3location = args.key.lstrip('/')
     cfntemplate = args.template
     cfntemplatefilename = os.path.basename(cfntemplate)
     cfntemplatename = os.path.splitext(cfntemplatefilename)[0]
     cfntemplate_url = ''
     options = args.options
+    extrafiles = args.files
+    extrafiles = extrafiles.rstrip('/')
+    extrafiles += '/'
+    s3bucket = args.s3bucket
+    s3location = args.key.lstrip('/')
+    s3location = s3location.rstrip('/')
+    s3location += '/'
 
     # Validate that the CloudFormation template file exists:
     if not os.path.isfile(cfntemplate):
         print 'ERROR: Template file', cfntemplate, 'was not found or is not a file.'
         sys.exit(2)
+
+    # Validate that the extrafiles directory exists (if we were supplied one), and make sure we also received a S3
+    # bucket as a parameter:
+    if not extrafiles == '':
+        if not os.path.isdir(extrafiles):
+            print 'ERROR: Extra files directory', extrafiles, 'was not found or is not a directory.'
+            sys.exit(2)
+        if not s3bucket:
+            print 'ERROR: You MUST specify a S3 bucket when using the -f or --files option.'
+            sys.exit(2)
 
     # Validate that the options file exists (if we were supplied one):
     if not options == '':
@@ -210,6 +249,10 @@ if __name__ == '__main__':
 
     # Validate the CloudFormation template against the CloudFormation service:
     valid = validate_template(session, cfntemplate, cfntemplate_url)
+
+    # Upload extra files (if directory has been provided):
+    if not extrafiles == '':
+        upload_files(session, s3bucket, s3location, extrafiles)
 
     # Determine whether this will be a create or an update stack operation:
     operation = determine_operation(session, cfntemplatename)
